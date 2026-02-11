@@ -1,0 +1,11 @@
+[project]
+name = "synthetic-data-hands-on"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "marimo>=0.19.9",
+    "mostlyai[local]>=5.10.1",
+    "scikit-learn>=1.8.0",
+]
