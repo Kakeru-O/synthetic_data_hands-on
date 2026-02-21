@@ -13,9 +13,8 @@ def _():
     from sklearn.neighbors import NearestNeighbors
     from sklearn.preprocessing import StandardScaler
     import numpy as np
-    import os
-
-    return MostlyAI, NearestNeighbors, StandardScaler, alt, mo, np, os, pd
+    from pathlib import Path
+    return MostlyAI, NearestNeighbors, StandardScaler, alt, mo, np, pd, Path
 
 
 @app.cell
@@ -48,28 +47,30 @@ def _(mo):
 
 
 @app.cell
-def _(mo, os, pd):
-    DATA_DIR = "data/raw"
-    DATA_FILE = "bank-marketing.csv"
-    DATA_PATH = os.path.join(DATA_DIR, DATA_FILE)
+def _(pd, Path):
+    DATA_PATH = Path("data/raw") / "bank-marketing.csv"
 
-    if os.path.exists(DATA_PATH):
-        mo.output.append(mo.md(f"✅ ローカルにデータが見つかりました: `{DATA_PATH}`"))
+    if DATA_PATH.exists():
         df_original = pd.read_csv(DATA_PATH)
     else:
-        mo.output.append(mo.md("📥 データが見つかりません。UCI Machine Learning Repositoryからダウンロードします..."))
         from ucimlrepo import fetch_ucirepo
         bank_marketing = fetch_ucirepo(id=222)
         X = bank_marketing.data.features
         y = bank_marketing.data.targets
         df_original = pd.concat([X, y], axis=1)
-        os.makedirs(DATA_DIR, exist_ok=True)
+        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
         df_original.to_csv(DATA_PATH, index=False)
-        mo.output.append(mo.md(f"✅ ダウンロード完了！ `{DATA_PATH}` に保存しました。"))
 
-    mo.output.append(mo.md(f"**データ件数:** {len(df_original)} レコード"))
-    mo.output.append(mo.ui.table(df_original, page_size=10, label="元データ (Original Sensitive Data)"))
-    return (df_original,)
+    return DATA_PATH, df_original
+
+
+@app.cell
+def _(DATA_PATH, df_original, mo):
+    mo.vstack([
+        mo.md(f"✅ データを読み込みました: `{DATA_PATH}` ({len(df_original)} レコード)"),
+        mo.ui.table(df_original, page_size=10, label="元データ (Original Sensitive Data)"),
+    ])
+    return
 
 
 @app.cell
@@ -107,7 +108,6 @@ def _(MostlyAI, df_original, generate_button, mo, pd, sample_size_slider):
         mostly = MostlyAI(local=True, local_dir="./mostlyai_local")
         # 各カラムのデータ型とエンコード方式を明示的に指定します。
         # 'month' カラムが TABULAR_DATETIME として誤認識され Pandas のエラーになるのを防ぐ目的も兼ねています。
-        # 参考までに、より高度な生成オプション（max_epochsや差分プライバシーなど）も設定可能です。
         config = {
             'name': 'Bank Marketing',
             'tables': [
@@ -145,11 +145,11 @@ def _(MostlyAI, df_original, generate_button, mo, pd, sample_size_slider):
         sd = mostly.generate(g, size=sample_size_slider.value)
         df_synthetic = sd.data()
 
-    mo.vstack([
+    _result = mo.vstack([
         mo.md(f"✅ **合成データの生成が完了しました！** ({len(df_synthetic)} レコード)"),
-        mo.ui.table(df_synthetic, page_size=10, label="合成データ (Generated Synthetic Data)")
+        mo.ui.table(df_synthetic, page_size=10, label="合成データ (Generated Synthetic Data)"),
     ])
-    return (df_synthetic,)
+    return df_synthetic, _result
 
 
 @app.cell
@@ -296,22 +296,17 @@ def _(NearestNeighbors, StandardScaler, df_original, df_synthetic, mo, np, pd):
             mo.ui.table(_comparison_df, label="比較表"),
             mo.md(f"**ユークリッド距離 (標準化後):** {_distances[0][0]:.4f}"),
             mo.md(f"""
-    **主な差分:**
+**主な差分:**
 
-    {_diff_text}
+{_diff_text}
 
-    > ✅ **結論:** 上記の通り、最も似ている実在データと比較しても属性値に違いがあります。
-    > これは、生成されたデータが元の個人の「コピー」ではなく、統計的な性質を受け継いだ**新しい架空の人物**であることを示しています。
-    > したがって、**再識別リスクは低い**と判断できます。
-    """),
+> ✅ **結論:** 上記の通り、最も似ている実在データと比較しても属性値に違いがあります。
+> これは、生成されたデータが元の個人の「コピー」ではなく、統計的な性質を受け継いだ**新しい架空の人物**であることを示しています。
+> したがって、**再識別リスクは低い**と判断できます。
+"""),
         ])
 
     _out
-    return
-
-
-@app.cell
-def _():
     return
 
 
